@@ -1,12 +1,12 @@
 # Introduction
 
-**VECROsim2** is a microservice fault simulation and diagnosis benchmarking platform. It supports:
+**VECROsim** is a microservice fault simulation and diagnosis benchmarking platform. It supports:
 - Deploying configurable service topologies in Kubernetes
 - Injecting multiple types of faults (CPU, memory, network, I/O, pod) using Fault Injector built inside or Chaos Mesh.
 - Collecting **multi-modal observability data** (metrics, logs, and traces) aligned with fault events.
 - Generating benchmark datasets for resilience evaluation and root cause diagnosis research
 
-Compared to [VECROsim]([etigerstudio/VECROsim](https://github.com/etigerstudio/VECROsim)), VECROsim2 integrates distributed tracing and logging, and provides more fine-grained, declarative fault injection capabilities.
+Compared to [VECROsim]([etigerstudio/VECROsim](https://github.com/etigerstudio/VECROsim)), VECROsim integrates distributed tracing and logging, and provides more fine-grained, declarative fault injection capabilities.
 
 ## ✨ Features
 
