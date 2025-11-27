@@ -8,10 +8,11 @@ import (
 	"math/rand"
 	"time"
 	"log"
+	"go.opentelemetry.io/otel"
 )
 
 type BaseService interface {
-	Execute() (string, error)
+	Execute(ctx context.Context) (string, error)
 }
 
 type baseService struct {
@@ -22,8 +23,15 @@ type baseService struct {
 }
 
 const itemsCount = 100000
+const executionTimeout = 2*time.Second // TODO: make service timeout configurable
 
-func (svc baseService) Execute() (string, error) {
+func (svc baseService) Execute(ctx context.Context) (string, error) {
+	ctx, span := otel.Tracer("vecro-service").Start(ctx, "BaseService.Execute")
+	defer span.End()
+
+	//ctx, cancel := context.WithTimeout(ctx, executionTimeout)
+	//defer cancel()
+
 	var result struct {
 		Value float64
 	}

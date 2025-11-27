@@ -16,9 +16,70 @@ import (
 	"github.com/go-kit/kit/log"
 	kitprometheus "github.com/go-kit/kit/metrics/prometheus"
 	httptransport "github.com/go-kit/kit/transport/http"
+
+	"go.opentelemetry.io/otel"
+    "go.opentelemetry.io/otel/exporters/jaeger"
+    "go.opentelemetry.io/otel/sdk/resource"
+    sdktrace "go.opentelemetry.io/otel/sdk/trace"
+    semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
+	"go.opentelemetry.io/otel/propagation"
+	"github.com/go-kit/kit/endpoint"
 )
 
+type contextKey string
+
+const contextKeyRequest contextKey = "http-request"
+
+
+func initTracer() func(context.Context) error {
+	serviceName := os.Getenv("VECRO_NAME")
+	if serviceName == "" {
+		serviceName = "default-service"
+	}
+
+	exporter, err := jaeger.New(jaeger.WithCollectorEndpoint(
+		jaeger.WithEndpoint("http://jaeger-collector:14268/api/traces"),
+	))
+	if err != nil {
+		slog.Printf("failed to create Jaeger exporter: %v", err)
+	} else {
+		slog.Println("success to build jaeger")
+	}
+
+	tp := sdktrace.NewTracerProvider(
+		sdktrace.WithBatcher(exporter),
+		sdktrace.WithResource(resource.NewWithAttributes(
+			semconv.SchemaURL,
+			semconv.ServiceNameKey.String(serviceName), // 动态命名
+		)),
+	)
+
+	otel.SetTextMapPropagator(propagation.TraceContext{})
+	otel.SetTracerProvider(tp)
+
+	return tp.Shutdown
+}
+
+func tracingMiddleware(tracerName, spanName string) endpoint.Middleware {
+	tracer := otel.Tracer(tracerName)
+
+	return func(next endpoint.Endpoint) endpoint.Endpoint {
+		return func(ctx context.Context, request interface{}) (interface{}, error) {
+			if r, ok := ctx.Value(contextKeyRequest).(*http.Request); ok {
+				ctx = propagator.Extract(ctx, propagation.HeaderCarrier(r.Header))
+			}
+
+			ctx, span := tracer.Start(ctx, spanName)
+			defer span.End()
+
+			return next(ctx, request)
+		}
+	}
+}
+
 func main() {
+	shutdown := initTracer()
+	defer shutdown(context.Background())
 	// -------------------
 	// Declare constants
 	// -------------------
@@ -154,14 +215,20 @@ func main() {
 	svc = loggingMiddleware(logger)(svc)
 	svc = instrumentingMiddleware(requestCount, latencyCounter, latencyHistogram, logger)(svc)
 
+	baseEndpoint := makeBaseEndPoint(svc)
+	baseEndpoint = tracingMiddleware("vecro-service", "BaseRequest")(baseEndpoint)
+
 	baseHandler := httptransport.NewServer(
-		makeBaseEndPoint(svc),
+		baseEndpoint,
 		decodeBaseRequest,
 		encodeResponse,
+		httptransport.ServerBefore(func(ctx context.Context, r *http.Request) context.Context {
+			return context.WithValue(ctx, contextKeyRequest, r)
+		}),
 		// Request throughput instrumentation
 		httptransport.ServerFinalizer(func(ctx context.Context, code int, r *http.Request) {
 			responseSize := ctx.Value(httptransport.ContextKeyResponseSize).(int64)
-			slog.Println("Info reponse_size", responseSize)
+			slog.Println("Info reponse_size:", responseSize)
 			throughput.Add(float64(responseSize))
 		}),
 	)

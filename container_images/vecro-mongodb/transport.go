@@ -8,11 +8,13 @@ import (
 	"net/http"
 
 	"github.com/go-kit/kit/endpoint"
+	"go.opentelemetry.io/otel/propagation"
 )
+var propagator = propagation.TraceContext{}
 
 func makeBaseEndPoint(svc BaseService) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
-		payload, err := svc.Execute()
+		payload, err := svc.Execute(ctx)
 		return baseResponse{Payload: payload}, err
 	}
 }
@@ -29,7 +31,10 @@ func encodeResponse(_ context.Context, w http.ResponseWriter, response interface
 	return json.NewEncoder(w).Encode(response)
 }
 
-func encodeRequest(_ context.Context, r *http.Request, request interface{}) error {
+func encodeRequest(ctx context.Context, r *http.Request, request interface{}) error {
+	// 注入 trace context 到 header
+	propagator.Inject(ctx, propagation.HeaderCarrier(r.Header))
+
 	var buf bytes.Buffer
 	err := json.NewEncoder(&buf).Encode(request)
 	if err != nil {

@@ -6,6 +6,7 @@ import (
 	slog "log"
 
 	"github.com/go-kit/kit/metrics"
+	"context"
 )
 
 func instrumentingMiddleware(
@@ -33,7 +34,7 @@ type instrmw struct {
 	BaseService
 }
 
-func (mw instrmw) Execute() (string, error) {
+func (mw instrmw) Execute(ctx context.Context) (string, error) {
 	defer func(begin time.Time) {
 		mw.requestCount.Add(1)
 		mw.latencyCounter.Add(time.Since(begin).Seconds())
@@ -41,5 +42,5 @@ func (mw instrmw) Execute() (string, error) {
 		slog.Println("Info request_latency:", time.Since(begin))
 	}(time.Now())
 
-	return mw.BaseService.Execute()
+	return mw.BaseService.Execute(ctx)
 }

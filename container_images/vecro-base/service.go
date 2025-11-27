@@ -30,8 +30,8 @@ func (svc baseService) Execute(ctx context.Context) (string, error) {
 	ctx, span := otel.Tracer("vecro-service").Start(ctx, "BaseService.Execute")
 	defer span.End()
 
-	//ctx, cancel := context.WithTimeout(ctx, executionTimeout)
-	//defer cancel()
+	ctx, cancel := context.WithTimeout(ctx, executionTimeout)
+	defer cancel()
 
 	log.Println("Info Starting service execution with timeout:", executionTimeout)
 	log.Printf("Info Simulating stress with delayTime=%d, cpuLoad=%d", svc.delayTime, svc.cpuLoad)

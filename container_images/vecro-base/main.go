@@ -239,7 +239,8 @@ func main() {
 	baseEndpoint = tracingMiddleware("vecro-service", "BaseRequest")(baseEndpoint)
 
 	baseHandler := httptransport.NewServer(
-		makeBaseEndPoint(svc),
+		//makeBaseEndPoint(svc),
+		baseEndpoint,
 		decodeBaseRequest,
 		encodeResponse,
 		httptransport.ServerBefore(func(ctx context.Context, r *http.Request) context.Context {
